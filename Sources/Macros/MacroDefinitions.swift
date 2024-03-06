@@ -29,7 +29,7 @@ import Foundation
 /// To instantiate a parametrized URL use `URL.appendingPathComponent(_:)` or `URL.appendingParameters(_:allowedReservedCharacters:)`
 /// To instantiate a URL from a String format, use `URL(string:)`
 ///
-/// - Parameter string: valid URL String Literal with URL scheme and
+/// - Parameter string: valid URL String Literal with URL scheme
 /// - Returns: URL instance if provided string argument is a valid URL
 /// - Throws: Compile-time error if provided string argument is not a valid URL
 ///
