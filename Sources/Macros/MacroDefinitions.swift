@@ -18,6 +18,20 @@
 
 import Foundation
 
-/// Compile-time validated URL instantiation
+/// Compile-time validated OS version independent URL instantiation from String Literal.
+///
+/// Used to statically validate preset URLs.
+/// The idea is to disable any flaky URL conversions like punycode or no-scheme urls, only 1-1 mapped String Literals can be used.
+///
+/// Usage: `let url = #URL("https://duckduckgo.com")`
+///
+/// - Note: Strings like "http://💩.la" or "1" are not valid #URL parameter values.
+/// To instantiate a parametrized URL use `URL.appendingPathComponent(_:)` or `URL.appendingParameters(_:allowedReservedCharacters:)`
+/// To instantiate a URL from a String format, use `URL(string:)`
+///
+/// - Parameter string: valid URL String Literal with URL scheme and
+/// - Returns: URL instance if provided string argument is a valid URL
+/// - Throws: Compile-time error if provided string argument is not a valid URL
+///
 @freestanding(expression)
-public macro URL(_ string: String) -> URL = #externalMacro(module: "MacrosImplementation", type: "URLMacro")
+public macro URL(_ string: StaticString) -> URL = #externalMacro(module: "MacrosImplementation", type: "URLMacro")
