@@ -17,37 +17,30 @@
 //
 
 import Foundation
+
+#if canImport(PackagePlugin)
+// Swift Package Plugin or Xcode Build Plugin
 import PackagePlugin
 
+extension SwiftLintPlugin: BuildToolPlugin {}
+
+#if canImport(XcodeProjectPlugin)
+// Xcode Build Plugin
+import XcodeProjectPlugin
+extension SwiftLintPlugin: XcodeBuildToolPlugin {}
+#endif
+
+#else
+
+// Standalone tool
+import ArgumentParser
+import XcodeEditor
+
+extension SwiftLintPlugin: ParsableCommand {}
+#endif
+
 @main
-struct SwiftLintPlugin: BuildToolPlugin {
-
-    func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
-        // disable output for SPM modules built in RELEASE mode
-        guard let target = target as? SourceModuleTarget else {
-            assertionFailure("invalid target")
-            return []
-        }
-
-        guard (target as? SwiftSourceModuleTarget)?.compilationConditions.contains(.debug) != false || target.kind == .test else {
-            print("SwiftLint: \(target.name): Skipping for RELEASE build")
-            return []
-        }
-
-        let inputFiles = target.sourceFiles(withSuffix: "swift").map(\.path)
-        guard !inputFiles.isEmpty else {
-            print("SwiftLint: \(target.name): No input files")
-            return []
-        }
-
-        return try createBuildCommands(
-            target: target.name,
-            inputFiles: inputFiles,
-            packageDirectory: context.package.directory.firstParentContainingConfigFile() ?? context.package.directory,
-            workingDirectory: context.pluginWorkDirectory,
-            tool: context.tool(named:)
-        )
-    }
+struct SwiftLintPlugin {
 
     // swiftlint:disable function_body_length
     private func createBuildCommands(
@@ -66,13 +59,17 @@ struct SwiftLintPlugin: BuildToolPlugin {
         let cacheURL = URL(fileURLWithPath: workingDirectory.appending("cache.json").string)
         let outputPath = workingDirectory.appending("output.txt").string
 
-        // if clean build: clear cache
+#if canImport(PackagePlugin)
         let buildDir = workingDirectory.removingLastComponent() // BrowserServicesKit
             .removingLastComponent() // browserserviceskit.output
             .removingLastComponent() // plugins
             .removingLastComponent() // SourcePackages
             .removingLastComponent() // DerivedData/DuckDuckGo-xxxx
             .appending("Build")
+#else
+        let buildDir = pluginContext.buildRoot.removingLastComponent()
+#endif
+        // if clean build: clear cache
         if let buildDirContents = try? fm.contentsOfDirectory(atPath: buildDir.string),
            !buildDirContents.contains("Products") {
             print("SwiftLint: \(target): Clean Build")
@@ -111,11 +108,11 @@ struct SwiftLintPlugin: BuildToolPlugin {
         }
 
         // merge diagnostics from last linter pass into cache
-        for outputLint in lastOutput.split(separator: "\n") {
-            guard let filePath = outputLint.split(separator: ":", maxSplits: 1).first.map(String.init),
+        for outputLine in lastOutput.split(separator: "\n") {
+            guard let filePath = outputLine.split(separator: ":", maxSplits: 1).first.map(String.init),
                   !filesToProcess.contains(filePath) else { continue }
 
-            newCache[filePath]?.appendDiagnosticsMessage(String(outputLint))
+            newCache[filePath]?.appendDiagnosticsMessage(String(outputLine))
         }
 
         // collect cached diagnostic messages from cache
@@ -153,7 +150,7 @@ struct SwiftLintPlugin: BuildToolPlugin {
             ]
 
         } else {
-            print("SwiftLint: \(target): No new files to process")
+            print("🤷‍♂️ SwiftLint: \(target): No new files to process")
             try JSONEncoder().encode(newCache).write(to: cacheURL)
             try "".write(toFile: outputPath, atomically: false, encoding: .utf8)
         }
@@ -186,13 +183,124 @@ struct SwiftLintPlugin: BuildToolPlugin {
     }
     // swiftlint:enable function_body_length
 
+    // MARK: - Standalone tool Main
+#if !canImport(PackagePlugin)
+
+    private func getModifiedFiles(at path: Path) -> [Path] {
+        let task = Process("/usr/bin/git", ["diff", "HEAD", "--name-only"])
+        task.currentDirectoryURL = URL(fileURLWithPath: path.string)
+
+        print("Running git diff at \(path)")
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.launch()
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let output = String(data: data, encoding: .utf8)
+
+        return output?.components(separatedBy: "\n").filter { !$0.isEmpty }.map{
+            path.appending(subpath: $0)
+        } ?? []
+    }
+
+    mutating func run() throws {
+        let target: XcodeTarget
+        let start = Date()
+
+        let gitRootFolders: [Path] = try {
+            struct ProjectCache: Codable {
+                let projectModified: Date
+                let gitRootFolders: [Path]
+            }
+            // try loading list of .git root folders from cache if pbxproj is not modified
+            let cacheURL = URL(fileURLWithPath: pluginContext.pluginWorkDirectory.appending("project_cache.json").string)
+
+            let projectModified = try pluginContext.xcodeProject.filePath.appending("project.pbxproj").modified
+            if let cache = (try? JSONDecoder().decode(ProjectCache.self, from: Data(contentsOf: cacheURL))),
+               cache.projectModified == projectModified {
+                return cache.gitRootFolders
+            }
+
+            // load xc project
+            let project = XCProjectWithCachedGroups(filePath: pluginContext.xcodeProject.filePath.string)!
+            let projectFiles = project.files() ?? []
+
+            // get all folders with `.git` subfolder (like BrowserServicesKit) from xc project build files
+            let gitRootFolders = projectFiles.compactMap { sourceFile in
+                let path = sourceFile.path
+                guard path.isDirectory && path.appending(subpath: ".git").exists else { return nil }
+                return path
+            } + [pluginContext.xcodeProject.directory] // and project root itself
+
+            // cache
+            let cache = ProjectCache(projectModified: projectModified, gitRootFolders: gitRootFolders)
+            try JSONEncoder().encode(cache).write(to: cacheURL)
+
+            return gitRootFolders
+        }()
+
+        // get all modified files
+        var buildFiles = Set<BuildFile>()
+        for gitRootFolder in gitRootFolders {
+            let modifiedFiles = getModifiedFiles(at: gitRootFolder)
+            buildFiles.formUnion(modifiedFiles.map { BuildFile(path: $0, type: .source) })
+        }
+
+        target = FakeTarget(displayName: "Target", files: buildFiles)
+        let time = Date().timeIntervalSince(start)
+        print("⏰ files parsing took \(String(format: "%.2f", time))s.")
+
+        let commands = try createBuildCommands(context: pluginContext, target: target)
+
+        for command in commands {
+            switch command {
+            case .prebuildCommand(displayName: let name, executable: let path, arguments: let args, outputFilesDirectory: _):
+                print("Running \(name)")
+                let process = Process(path.string, args)
+                try process.run()
+                process.waitUntilExit()
+            }
+        }
+    }
+#endif
+
 }
 
-#if canImport(XcodeProjectPlugin)
+// MARK: - Swift Package Plugin
+#if canImport(PackagePlugin)
+extension SwiftLintPlugin {
+    func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
+        // disable output for SPM modules built in RELEASE mode
+        guard let target = target as? SourceModuleTarget else {
+            assertionFailure("invalid target")
+            return []
+        }
 
-import XcodeProjectPlugin
+        guard (target as? SwiftSourceModuleTarget)?.compilationConditions.contains(.debug) != false || target.kind == .test else {
+            print("SwiftLint: \(target.name): Skipping for RELEASE build")
+            return []
+        }
 
-extension SwiftLintPlugin: XcodeBuildToolPlugin {
+        let inputFiles = target.sourceFiles(withSuffix: "swift").map(\.path)
+        guard !inputFiles.isEmpty else {
+            print("SwiftLint: \(target.name): No input files")
+            return []
+        }
+
+        return try createBuildCommands(
+            target: target.name,
+            inputFiles: inputFiles,
+            packageDirectory: context.package.directory.firstParentContainingConfigFile() ?? context.package.directory,
+            workingDirectory: context.pluginWorkDirectory,
+            tool: context.tool(named:)
+        )
+    }
+}
+#endif
+
+// MARK: - Xcode Build Plugin and standalone tool launcher
+#if canImport(XcodeProjectPlugin) || !canImport(PackagePlugin)
+extension SwiftLintPlugin {
     func createBuildCommands(context: XcodePluginContext, target: XcodeTarget) throws -> [Command] {
         let inputFiles = target.inputFiles.filter {
             $0.type == .source && $0.path.extension == "swift"

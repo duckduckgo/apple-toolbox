@@ -11,26 +11,30 @@ let package = Package(
         .macOS("11.4")
     ],
     products: [
-        .plugin(name: "SwiftLintPlugin", targets: ["SwiftLintPlugin"]),
         .library(name: "Macros", targets: ["Macros"]),
+        .executable(name: "SwiftLintTool", targets: ["SwiftLintTool"]),
     ],
     dependencies: [
         // Depend on the Swift 5.9 release of SwiftSyntax
         .package(url: "https://github.com/apple/swift-syntax.git", from: "509.0.0"),
         .package(url: "https://github.com/pointfreeco/swift-macro-testing.git", from: "0.2.2"),
+        .package(url: "https://github.com/appsquickly/XcodeEditor.git", branch: "master"),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
     ],
     targets: [
-        .plugin(
-            name: "SwiftLintPlugin",
-            capability: .buildTool(),
-            dependencies: [
-                .target(name: "SwiftLintBinary", condition: .when(platforms: [.macOS]))
-            ]
-        ),
         .binaryTarget(
             name: "SwiftLintBinary",
             url: "https://github.com/realm/SwiftLint/releases/download/0.54.0/SwiftLintBinary-macos.artifactbundle.zip",
             checksum: "963121d6babf2bf5fd66a21ac9297e86d855cbc9d28322790646b88dceca00f1"
+        ),
+        .executableTarget(
+            name: "SwiftLintTool",
+            dependencies: [
+                "SwiftLintBinary",
+                .product(name: "XcodeEditor", package: "XcodeEditor"),
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ],
+            path: "Plugins/SwiftLintPlugin"
         ),
         // Macro implementation that performs the source transformation of a macro.
         .macro(
@@ -38,14 +42,12 @@ let package = Package(
             dependencies: [
                 .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
                 .product(name: "SwiftCompilerPlugin", package: "swift-syntax")
-            ],
-            plugins: [.plugin(name: "SwiftLintPlugin")]
+            ]
         ),
         // Library that exposes a macro as part of its API, which is used in client programs.
         .target(
             name: "Macros",
-            dependencies: ["MacrosImplementation"],
-            plugins: [.plugin(name: "SwiftLintPlugin")]
+            dependencies: ["MacrosImplementation"]
         ),
         .testTarget(
             name: "MacrosTests",
@@ -53,8 +55,7 @@ let package = Package(
                 "MacrosImplementation",
                 .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax"),
                 .product(name: "MacroTesting", package: "swift-macro-testing"),
-            ],
-            plugins: [.plugin(name: "SwiftLintPlugin")]
+            ]
         ),
     ]
 )
