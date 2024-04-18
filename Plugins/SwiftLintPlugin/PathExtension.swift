@@ -17,7 +17,94 @@
 //
 
 import Foundation
+
+#if canImport(PackagePlugin)
 import PackagePlugin
+#else
+public struct Path: Hashable {
+
+    let string: String
+
+    var stringValue: String { string }
+
+    init(_ string: String) {
+        self.string = string
+    }
+
+    /// The last path component (without any extension).
+    public var stem: String {
+        let filename = self.lastComponent
+        if let ext = self.extension {
+            return String(filename.dropLast(ext.count + 1))
+        } else {
+            return filename
+        }
+    }
+
+    var lastComponent: String {
+        (string as NSString).lastPathComponent
+    }
+
+    var `extension`: String? {
+        let ext = (string as NSString).pathExtension
+        if ext.isEmpty { return nil }
+        return ext
+    }
+
+    func removingLastComponent() -> Path {
+        Path((string as NSString).deletingLastPathComponent)
+    }
+
+    func appending(subpath: String) -> Path {
+        return Path(string + (string.hasSuffix("/") ? "" : "/") + subpath)
+    }
+
+    func appending(_ components: [String]) -> Path {
+        return self.appending(subpath: components.joined(separator: "/"))
+    }
+
+    func appending(_ components: String...) -> Path {
+        return self.appending(components)
+    }
+
+    func appending(_ path: Path) -> Path {
+        return appending(subpath: path.string)
+    }
+
+}
+
+extension Path: CustomStringConvertible {
+
+    @available(_PackageDescription, deprecated: 6.0)
+    public var description: String {
+        return self.string
+    }
+}
+
+extension Path: Codable {
+
+    @available(_PackageDescription, deprecated: 6.0)
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(self.string)
+    }
+
+    @available(_PackageDescription, deprecated: 6.0)
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let string = try container.decode(String.self)
+        self.init(string)
+    }
+}
+
+public extension String.StringInterpolation {
+
+    @available(_PackageDescription, deprecated: 6.0)
+    mutating func appendInterpolation(_ path: Path) {
+        self.appendInterpolation(path.string)
+    }
+}
+#endif
 
 extension Path {
 
@@ -68,6 +155,33 @@ extension Path {
 
     var url: URL {
         URL(fileURLWithPath: self.string)
+    }
+
+    var isAbsolute: Bool {
+        string.hasPrefix("/")
+    }
+
+    var exists: Bool {
+        return FileManager.default.fileExists(atPath: string)
+    }
+
+    var isDirectory: Bool {
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: string, isDirectory: &isDirectory) else { return false }
+        return isDirectory.boolValue
+    }
+
+    func getDirectoryContents(filter: (Path) throws -> Bool = { _ in true }) rethrows -> [Path] {
+        var files: [Path] = []
+        let fileManager = FileManager.default
+
+        guard let enumerator = fileManager.enumerator(atPath: self.string) else { return files }
+
+        for case let file as String in enumerator where try filter(Path(file)) {
+            files.append(Path(file))
+        }
+
+        return files
     }
 
 }
