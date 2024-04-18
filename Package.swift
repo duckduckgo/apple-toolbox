@@ -18,7 +18,6 @@ let package = Package(
         // Depend on the Swift 5.9 release of SwiftSyntax
         .package(url: "https://github.com/apple/swift-syntax.git", from: "509.0.0"),
         .package(url: "https://github.com/pointfreeco/swift-macro-testing.git", from: "0.2.2"),
-        .package(url: "https://github.com/appsquickly/XcodeEditor.git", branch: "master"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
     ],
     targets: [
@@ -31,7 +30,6 @@ let package = Package(
             name: "SwiftLintTool",
             dependencies: [
                 "SwiftLintBinary",
-                .product(name: "XcodeEditor", package: "XcodeEditor"),
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
             path: "Plugins/SwiftLintPlugin"

@@ -35,15 +35,6 @@
         "revision" : "64889f0c732f210a935a0ad7cda38f77f876262d",
         "version" : "509.1.1"
       }
-    },
-    {
-      "identity" : "xcodeeditor",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/appsquickly/XcodeEditor.git",
-      "state" : {
-        "branch" : "master",
-        "revision" : "f3234db7fc40d8e917e169bc937ed03ca76ba885"
-      }
     }
   ],
   "version" : 2

@@ -20,7 +20,6 @@
 #if !canImport(PackagePlugin)
 
 import Foundation
-import XcodeEditor
 
 /// Maps XcodeEditor productType to Build Plugin FileType
 enum TargetKind: String {
@@ -43,84 +42,11 @@ public enum FileType: Equatable {
     case header
     case resource
     case unknown
-
-    // swiftlint:disable:next cyclomatic_complexity
-    init(_ type: XcodeSourceFileType) {
-        self = switch type {
-        case .Framework: .unknown
-        case .PropertyList: .resource
-        case .SourceCodeHeader: .header
-        case .SourceCodeObjC: .source
-        case .SourceCodeObjCPlusPlus: .source
-        case .SourceCodeCPlusPlus: .source
-        case .XibFile: .resource
-        case .ImageResourcePNG: .resource
-        case .Bundle: .resource
-        case .Archive: .resource
-        case .HTML: .resource
-        case .TEXT: .resource
-        case .XcodeProject: .unknown
-        case .Folder: .unknown
-        case .AssetCatalog: .resource
-        case .SourceCodeSwift: .source
-        case .Application: .unknown
-        case .Playground: .unknown
-        case .ShellScript: .unknown
-        case .Markdown: .resource
-        case .XMLPropertyList: .resource
-        case .Storyboard: .resource
-        case .XCConfig: .unknown
-        case .XCDataModel: .resource
-        case .LocalizableStrings: .resource
-        default: .unknown
-        }
-    }
 }
 
 protocol File {
     var path: Path { get }
     var type: FileType { get }
-}
-
-/// More effective XCSourceFile path construction with file.key->parent-group map
-final class XCProjectWithCachedGroups: XCProject {
-
-    private var _groupsByMemberKey: [String: XCGroup]?
-    var groupsByMemberKey: [String: XCGroup] {
-        if let key = _groupsByMemberKey { return key }
-
-        var groupsByMemberKey = [String: XCGroup]()
-        for group in groups() ?? [] {
-            for key in group.children {
-                groupsByMemberKey[(key as? String)!] = group
-            }
-        }
-        _groupsByMemberKey = groupsByMemberKey
-        return groupsByMemberKey
-    }
-
-    override func groupForGroupMember(withKey key: String!) -> XCGroup! {
-        return groupsByMemberKey[key]
-    }
-
-}
-
-/// Maps XcodeEditor XCSourceFile to Build Plugin File
-extension XCSourceFile: File {
-
-    var path: Path {
-        let path = if let name, name.contains("/") {
-            Path(name)
-        } else {
-            Path(pathRelativeToProjectRoot() ?? value(forKey: "_path") as? String ?? name)
-        }
-        return path.isAbsolute ? path : pluginContext.xcodeProject.directory.appending(path)
-    }
-
-    var type: FileType {
-        FileType(XcodeSourceFileType(rawValue: (value(forKey: "_type") as? NSNumber)?.intValue ?? 0))
-    }
-
 }
 
 protocol XcodeTarget {
@@ -139,27 +65,6 @@ extension XcodeTarget {
     }
 }
 
-/// Maps XcodeEditor XCTarget to Build Plugin XcodeTarget
-extension XCTarget: XcodeTarget {
-
-    var displayName: String {
-        name
-    }
-
-    var kind: TargetKind {
-        TargetKind(productType: productType)
-    }
-
-    var sourceFiles: [XCSourceFile] {
-        members().compactMap { $0 as? XCSourceFile }
-    }
-
-    var inputFiles: [File] {
-        sourceFiles as [File]
-    }
-
-}
-
 struct FakeTarget: XcodeTarget {
     var displayName: String
     var kind: TargetKind = .main
@@ -172,15 +77,6 @@ struct FakeTarget: XcodeTarget {
 struct BuildFile: Hashable, File {
     var path: Path
     var type: FileType
-
-    init(path: Path, type: FileType) {
-        self.path = path
-        self.type = type
-    }
-
-    init(sourceFile: XCSourceFile) {
-        self.init(path: sourceFile.path, type: sourceFile.type)
-    }
 }
 
 enum Command {

@@ -34,7 +34,6 @@ extension SwiftLintPlugin: XcodeBuildToolPlugin {}
 
 // Standalone tool
 import ArgumentParser
-import XcodeEditor
 
 extension SwiftLintPlugin: ParsableCommand {}
 #endif
@@ -226,12 +225,12 @@ struct SwiftLintPlugin {
             }
 
             // load xc project
-            let project = XCProjectWithCachedGroups(filePath: pluginContext.xcodeProject.filePath.string)!
-            let projectFiles = project.files() ?? []
+            let project = try XCProject(path: pluginContext.xcodeProject.filePath)
 
             // get all folders with `.git` subfolder (like BrowserServicesKit) from xc project build files
-            let gitRootFolders = projectFiles.compactMap { sourceFile in
-                let path = sourceFile.path
+            let gitRootFolders = project.objects.values.compactMap { obj -> Path? in
+                guard obj.isa == .fileReference else { return nil }
+                let path = obj.path
                 guard path.isDirectory && path.appending(subpath: ".git").exists else { return nil }
                 return path
             } + [pluginContext.xcodeProject.directory] // and project root itself
