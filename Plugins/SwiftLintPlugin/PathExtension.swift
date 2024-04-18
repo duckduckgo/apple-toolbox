@@ -165,6 +165,12 @@ extension Path {
         return FileManager.default.fileExists(atPath: string)
     }
 
+    var isExistingFile: Bool {
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: string, isDirectory: &isDirectory) else { return false }
+        return !isDirectory.boolValue
+    }
+
     var isDirectory: Bool {
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: string, isDirectory: &isDirectory) else { return false }
