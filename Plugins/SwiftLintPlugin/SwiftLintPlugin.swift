@@ -201,8 +201,11 @@ struct SwiftLintPlugin {
         let output = try Process(git, ["diff", "HEAD", "--name-only"], workDirectory: path)
             .executeCommand()
 
-        return output.components(separatedBy: "\n").filter { !$0.isEmpty }.map{
-            path.appending(subpath: $0) // absolute path
+        return output.components(separatedBy: "\n").compactMap {
+            guard !$0.isEmpty else { return nil }
+            let absolutePath = path.appending(subpath: $0)
+            guard absolutePath.exists else { return nil }
+            return absolutePath
         }
     }
 
