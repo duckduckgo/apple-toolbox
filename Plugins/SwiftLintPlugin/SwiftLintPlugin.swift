@@ -198,11 +198,15 @@ struct SwiftLintPlugin {
         }()
 
         print("Running \(git) diff at \(path)")
-        let output = try Process(git, ["diff", "HEAD", "--name-only"], workDirectory: path)
-            .executeCommand()
+        let output = try Process(git, ["diff", "HEAD", "--name-only"], workDirectory: path).executeCommand().components(separatedBy: "\n")
+        // append non-tracked files
+        + Process(git, ["ls-files", "--others", "--exclude-standard"], workDirectory: path).executeCommand().components(separatedBy: "\n")
 
-        return output.components(separatedBy: "\n").filter { !$0.isEmpty }.map{
-            path.appending(subpath: $0) // absolute path
+        return output.compactMap {
+            guard !$0.isEmpty else { return nil }
+            let absolutePath = path.appending(subpath: $0)
+            guard absolutePath.isExistingFile else { return nil }
+            return absolutePath
         }
     }
 
@@ -251,7 +255,7 @@ struct SwiftLintPlugin {
 
         target = FakeTarget(displayName: "Target", files: buildFiles)
         let time = Date().timeIntervalSince(start)
-        print("⏰ files parsing took \(String(format: "%.2f", time))s.")
+        print("⏰ parsing took \(String(format: "%.2f", time))s.")
 
         let commands = try createBuildCommands(context: pluginContext, target: target)
 
