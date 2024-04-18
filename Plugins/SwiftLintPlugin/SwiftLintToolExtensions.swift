@@ -44,6 +44,7 @@ public enum FileType: Equatable {
     case resource
     case unknown
 
+    // swiftlint:disable:next cyclomatic_complexity
     init(_ type: XcodeSourceFileType) {
         self = switch type {
         case .Framework: .unknown
@@ -82,16 +83,16 @@ protocol File {
 }
 
 /// More effective XCSourceFile path construction with file.key->parent-group map
-class XCProjectWithCachedGroups: XCProject {
+final class XCProjectWithCachedGroups: XCProject {
 
     private var _groupsByMemberKey: [String: XCGroup]?
     var groupsByMemberKey: [String: XCGroup] {
-        if let _groupsByMemberKey { return _groupsByMemberKey }
+        if let key = _groupsByMemberKey { return key }
 
         var groupsByMemberKey = [String: XCGroup]()
         for group in groups() ?? [] {
             for key in group.children {
-                groupsByMemberKey[key as! String] = group
+                groupsByMemberKey[(key as? String)!] = group
             }
         }
         _groupsByMemberKey = groupsByMemberKey
@@ -117,7 +118,7 @@ extension XCSourceFile: File {
     }
 
     var type: FileType {
-        FileType(XcodeSourceFileType(rawValue: (value(forKey: "_type") as! NSNumber).intValue))
+        FileType(XcodeSourceFileType(rawValue: (value(forKey: "_type") as? NSNumber)?.intValue ?? 0))
     }
 
 }
@@ -219,7 +220,7 @@ struct PluginContext {
     var pluginWorkDirectory: Path {
         let path = Path(ProcessInfo().arguments[0] + "_files")
         if !FileManager.default.fileExists(atPath: path.string) {
-            try! FileManager.default.createDirectory(atPath: path.string, withIntermediateDirectories: false)
+            try! FileManager.default.createDirectory(atPath: path.string, withIntermediateDirectories: false) // swiftlint:disable:this force_try
         }
         return path
     }
@@ -237,6 +238,7 @@ struct PluginContext {
         var path = packageArtifacts.appending(["apple-toolbox", "SwiftLintBinary", "SwiftLintBinary.artifactbundle"])
         let fm = FileManager.default
 
+        // swiftlint:disable:next force_try
         let swiftlintFolder = try! fm.contentsOfDirectory(atPath: path.string).first(where: {
             var isFolder: ObjCBool = false
             return $0.hasPrefix("swiftlint") && fm.fileExists(atPath: path.appending(subpath: $0).string, isDirectory: &isFolder) && isFolder.boolValue
@@ -250,18 +252,5 @@ struct PluginContext {
 typealias XcodePluginContext = PluginContext
 
 let pluginContext = PluginContext()
-
-extension Process {
-
-    convenience init(_ command: String, _ args: [String], workDirectory: URL? = nil) {
-        self.init()
-        self.executableURL = URL(fileURLWithPath: command)
-        self.arguments = args
-        if let workDirectory = workDirectory {
-            self.currentDirectoryURL = workDirectory
-        }
-    }
-
-}
 
 #endif

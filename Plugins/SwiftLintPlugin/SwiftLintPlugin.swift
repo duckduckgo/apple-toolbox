@@ -186,21 +186,25 @@ struct SwiftLintPlugin {
     // MARK: - Standalone tool Main
 #if !canImport(PackagePlugin)
 
-    private func getModifiedFiles(at path: Path) -> [Path] {
-        let task = Process("/usr/bin/git", ["diff", "HEAD", "--name-only"])
-        task.currentDirectoryURL = URL(fileURLWithPath: path.string)
+    private func getModifiedFiles(at path: Path) throws -> [Path] {
+        // path to `git`
+        let git = try {
+            let cacheURL = pluginContext.pluginWorkDirectory.appending("git").url
+            if let cached = try? String(contentsOf: cacheURL) { return cached }
+            let whichGit = Process.which("git")
+            print("no chached git, running `\(whichGit.executableURL!.path) git`")
+            let git = try whichGit.executeCommand()
+            try? git.write(to: cacheURL, atomically: false, encoding: .utf8)
+            return git
+        }()
 
-        print("Running git diff at \(path)")
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.launch()
+        print("Running \(git) diff at \(path)")
+        let output = try Process(git, ["diff", "HEAD", "--name-only"], workDirectory: path)
+            .executeCommand()
 
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let output = String(data: data, encoding: .utf8)
-
-        return output?.components(separatedBy: "\n").filter { !$0.isEmpty }.map{
-            path.appending(subpath: $0)
-        } ?? []
+        return output.components(separatedBy: "\n").filter { !$0.isEmpty }.map{
+            path.appending(subpath: $0) // absolute path
+        }
     }
 
     mutating func run() throws {
@@ -242,7 +246,7 @@ struct SwiftLintPlugin {
         // get all modified files
         var buildFiles = Set<BuildFile>()
         for gitRootFolder in gitRootFolders {
-            let modifiedFiles = getModifiedFiles(at: gitRootFolder)
+            let modifiedFiles = try getModifiedFiles(at: gitRootFolder)
             buildFiles.formUnion(modifiedFiles.map { BuildFile(path: $0, type: .source) })
         }
 
