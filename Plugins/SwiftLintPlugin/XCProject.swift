@@ -38,11 +38,14 @@ final class XCProject {
         case noObjects
     }
 
+    let projectFile: Path
     private(set) var objects = [String: XCObject]()
     private(set) var parents = [String /* child key */: String /* parent key */]()
     private var pathCache = [String: Path]()
 
     init(path: Path) throws {
+        self.projectFile = path
+
         let dataStore = try NSDictionary(contentsOf: pluginContext.xcodeProject.filePath.appending("project.pbxproj").url, error: ())
         let projectObjects = try dataStore["objects"] as? [String: Any] ?? { throw DecodingError.noObjects }()
 
@@ -89,7 +92,11 @@ extension XCProject.XCObject {
         } else {
             pathRelativeToProjectRoot()
         }
-        return path.isAbsolute ? path : pluginContext.xcodeProject.directory.appending(path)
+        if !path.isAbsolute, let project {
+            return project.projectFile.removingLastComponent().appending(path)
+        } else {
+            return path
+        }
     }
 
 }
