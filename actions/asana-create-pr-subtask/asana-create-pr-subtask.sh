@@ -47,19 +47,18 @@ _set_parent_task_name() {
 _check_pr_subtask_exist() {
 	local response="$1"
 	local asana_assignee_id="$2"
+	local github_repo_name="$3"
 
 	# read each line of the array
 	# extract the task name and trim leading and trailing white spaces
-	# extract the parent name and trim leading and trailing white spaces
 	# extract the assignee name
-	# checks if the task name has 'PR:' prefix and if contains the parent name and if it's assigned to the reviewer
+	# checks if the task name has 'PR:' prefix the repository name as suffix and if it's assigned to the reviewer
 	echo "$response" | jq -c '.[]' | while read -r item; do
 		task_name=$(jq -r '.task_name' <<< "$item" | awk '{$1=$1};1')
-		parent_name=$(jq -r '.parent_name' <<< "$item" | awk '{$1=$1};1')
 		assignee=$(jq -r '.assignee' <<< "$item")
 
-		if [[ "$task_name" == "${pr_prefix}"* && "$task_name" == *"$parent_name"* && "$assignee" == "$asana_assignee_id" ]]; then
-			echo "$item"
+		if [[ "$task_name" == "${pr_prefix}"*"(${github_repo_name})" && "$assignee" == "$asana_assignee_id" ]]; then
+    		echo "$item"
 		fi
 	done
 
@@ -70,7 +69,10 @@ _create_pr_subtask() {
 	local asana_task_id="$1"
 	local asana_assignee_id="$2"
 	local github_pr_url="$3"
+	local github_repo_name="$4"
+
 	local url="${asana_api_url}/tasks/${asana_task_id}/subtasks?opt_fields=gid"
+	local task_name="${pr_prefix} ${parent_task_name} (${github_repo_name})"
 
 	local payload
 	payload=$(cat <<-EOF
@@ -78,7 +80,7 @@ _create_pr_subtask() {
 			"data": {
 				"assignee": "${asana_assignee_id}",
 				"notes": "${pr_prefix} ${github_pr_url}",
-				"name": "${pr_prefix} ${parent_task_name}"
+				"name": "${task_name}"
 			}
 		}
 		EOF
@@ -125,6 +127,7 @@ main() {
 	local asana_task_id="$1"
 	local asana_assignee_id="$2"
 	local github_pr_url="$3"
+	local github_repo_name="$4"
 
 	# fetch the task subtasks
 	local subtasks
@@ -135,14 +138,14 @@ main() {
 
 	# check if the PR subtask already exist
 	local pr_subtask
-	pr_subtask=$(_check_pr_subtask_exist "$subtasks" "$asana_assignee_id")
+	pr_subtask=$(_check_pr_subtask_exist "$subtasks" "$asana_assignee_id" "$github_repo_name")
 
 	# if the PR subtask exist, mark the task uncompleted if it the task is marked completed
 	# otherwise, create the PR subtask and assign it to the reviewer
 	if [[ -n "$pr_subtask" ]]; then
 		_mark_task_uncompleted_if_needed "$pr_subtask"
 	else
-		_create_pr_subtask "$asana_task_id" "$asana_assignee_id" "$github_pr_url"
+		_create_pr_subtask "$asana_task_id" "$asana_assignee_id" "$github_pr_url" "$github_repo_name"
 	fi
 }
 
