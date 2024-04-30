@@ -51,15 +51,13 @@ _check_pr_subtask_exist() {
 
 	# read each line of the array
 	# extract the task name and trim leading and trailing white spaces
-	# extract the parent name and trim leading and trailing white spaces
 	# extract the assignee name
-	# checks if the task name has 'PR:' prefix and if contains the parent name and if it's assigned to the reviewer
+	# checks if the task name has 'PR:' prefix the repository name as suffix and if it's assigned to the reviewer
 	echo "$response" | jq -c '.[]' | while read -r item; do
 		task_name=$(jq -r '.task_name' <<< "$item" | awk '{$1=$1};1')
-		parent_name=$(jq -r '.parent_name' <<< "$item" | awk '{$1=$1};1')
 		assignee=$(jq -r '.assignee' <<< "$item")
 
-		if [[ "$task_name" == "${pr_prefix} ${parent_name} (${github_repo_name})" && "$assignee" == "$asana_assignee_id" ]]; then
+		if [[ "$task_name" == "${pr_prefix}"*"(${github_repo_name})" && "$assignee" == "$asana_assignee_id" ]]; then
     		echo "$item"
 		fi
 	done
