@@ -1,0 +1,27 @@
+name: Get Asana user ID matching GitHub handle
+description: Returns Asana user ID that matches GitHub user handle
+inputs:
+  access-token:
+    description: "Asana access token"
+    required: true
+    type: string
+  github-handle:
+    description: "GitHub user handle"
+    required: true
+    type: string
+outputs:
+  user-id:
+    description: "Asana user ID"
+    value: ${{ steps.get-asana-user-id.outputs.user-id }}
+runs:
+  using: "composite"
+  steps:
+    - id: get-asana-user-id
+      run: |
+        user_id="$(yq ."${{ inputs.github-handle }}" ${{ github.action_path }}/github-asana-user-id-mapping.yml)"
+        if [[ -z "$user_id" || "$user_id" == "null" ]]; then
+          echo "::warning::Asana User ID not found for GitHub handle: ${{ inputs.github-handle }}"
+        else
+          echo "user-id=${user_id}" >> $GITHUB_OUTPUT
+        fi
+      shell: bash
