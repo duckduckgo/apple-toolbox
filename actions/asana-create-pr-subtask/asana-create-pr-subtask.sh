@@ -64,6 +64,24 @@ _check_pr_subtask_exist() {
 
 }
 
+# Gets the next business day (skips weekends)
+_get_next_business_day() {
+    local next_date
+    next_date=$(date -d "+1 day" "+%Y-%m-%d")
+    
+    # Check if the next day is a weekend
+    local day_of_week
+    day_of_week=$(date -d "$next_date" "+%u")
+    
+    if [ "$day_of_week" = "6" ]; then  # Saturday
+        next_date=$(date -d "$next_date +2 days" "+%Y-%m-%d")
+    elif [ "$day_of_week" = "7" ]; then  # Sunday
+        next_date=$(date -d "$next_date +1 day" "+%Y-%m-%d")
+    fi
+    
+    echo "${next_date}"
+}
+
 # Creates a subtask called PR: ${task_title}, set the PR URL as description and assign to the requested reviewer
 _create_pr_subtask() {
 	local asana_task_id="$1"
@@ -73,6 +91,7 @@ _create_pr_subtask() {
 
 	local url="${asana_api_url}/tasks/${asana_task_id}/subtasks?opt_fields=gid"
 	local task_name="${pr_prefix} ${parent_task_name} (${github_repo_name})"
+	local due_date=$(_get_next_business_day)
 
 	local payload
 	payload=$(cat <<-EOF
@@ -80,7 +99,8 @@ _create_pr_subtask() {
 			"data": {
 				"assignee": "${asana_assignee_id}",
 				"notes": "${pr_prefix} ${github_pr_url}",
-				"name": "${task_name}"
+				"name": "${task_name}",
+				"due_on": "${due_date}"
 			}
 		}
 		EOF
