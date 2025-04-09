@@ -11,29 +11,16 @@ let package = Package(
         .macOS("11.4")
     ],
     products: [
-        .library(name: "Macros", targets: ["Macros"]),
-        .executable(name: "SwiftLintTool", targets: ["SwiftLintTool"]),
+        .library(name: "Macros", targets: ["Macros"])
     ],
     dependencies: [
         // Depend on the Swift 5.9 release of SwiftSyntax
         .package(url: "https://github.com/apple/swift-syntax.git", exact: "509.1.1"),
         .package(url: "https://github.com/pointfreeco/swift-macro-testing.git", exact: "0.2.2"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.4.0"),
+        .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", exact: "0.59.0")
     ],
     targets: [
-        .binaryTarget(
-            name: "SwiftLintBinary",
-            url: "https://github.com/realm/SwiftLint/releases/download/0.54.0/SwiftLintBinary-macos.artifactbundle.zip",
-            checksum: "963121d6babf2bf5fd66a21ac9297e86d855cbc9d28322790646b88dceca00f1"
-        ),
-        .executableTarget(
-            name: "SwiftLintTool",
-            dependencies: [
-                "SwiftLintBinary",
-                .product(name: "ArgumentParser", package: "swift-argument-parser"),
-            ],
-            path: "Plugins/SwiftLintPlugin"
-        ),
         // Macro implementation that performs the source transformation of a macro.
         .macro(
             name: "MacrosImplementation",
