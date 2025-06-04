@@ -27,7 +27,7 @@ runs:
         uses: duckduckgo/native-github-asana-sync@v1.9
         with:
           action: 'get-asana-user-id'
-          github-username: ${{ inputs.commit-author }}
+          github-username: ${{ inputs.github-reviewer-user }}
           github-pat: ${{ inputs.github-token }}
 
       - name: Get PR URL
