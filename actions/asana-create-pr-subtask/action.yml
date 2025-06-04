@@ -15,15 +15,20 @@ inputs:
     description: "GitHub username for the requested reviewer"
     required: true
     type: string
+  github-token:
+    description: "GitHub token"
+    required: false
+    type: string
 runs:
   using: "composite"
   steps:
       - name: Get Asana user ID
         id: get-asana-user-id
-        uses: duckduckgo/apple-toolbox/actions/asana-get-user-id-for-github-handle@main
+        uses: duckduckgo/native-github-asana-sync@v1.9
         with:
-          access-token: ${{ inputs.access-token }}
-          github-handle: ${{ inputs.github-reviewer-user }}
+          action: 'get-asana-user-id'
+          github-username: ${{ inputs.commit-author }}
+          github-pat: ${{ inputs.github-token }}
 
       - name: Get PR URL
         id: get-pr-url
@@ -37,9 +42,9 @@ runs:
           ASANA_ACCESS_TOKEN: ${{ inputs.access-token }}
         run: |
           # If the Asana User ID is not found, exit with an error
-          if [[ -z "${{ steps.get-asana-user-id.outputs.user-id }}" ]]; then
+          if [[ -z "${{ steps.get-asana-user-id.outputs.asanaUserId }}" ]]; then
             echo "Error: Failed to get Asana user ID for GitHub user ${{ inputs.github-reviewer-user }}"
             exit 1
           else
-            ${{ github.action_path }}/asana-create-pr-subtask.sh ${{ inputs.asana-task-id }} ${{ steps.get-asana-user-id.outputs.user-id }} ${{ steps.get-pr-url.outputs.url }} ${{ github.event.repository.name }}
+            ${{ github.action_path }}/asana-create-pr-subtask.sh ${{ inputs.asana-task-id }} ${{ steps.get-asana-user-id.outputs.asanaUserId }} ${{ steps.get-pr-url.outputs.url }} ${{ github.event.repository.name }}
           fi
