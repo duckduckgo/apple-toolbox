@@ -17,8 +17,8 @@ let package = Package(
     dependencies: [
         // Depend on the Swift 5.9 release of SwiftSyntax
         .package(url: "https://github.com/apple/swift-syntax", "509.0.0"..<"602.0.0"),
-        .package(url: "https://github.com/pointfreeco/swift-macro-testing.git", from: "0.2.2"),
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
+        .package(url: "https://github.com/pointfreeco/swift-macro-testing.git", exact: "0.2.2"),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.4.0"),
     ],
     targets: [
         .binaryTarget(
