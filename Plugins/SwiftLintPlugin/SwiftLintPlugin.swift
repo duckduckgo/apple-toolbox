@@ -71,7 +71,7 @@ struct SwiftLintPlugin {
         // if clean build: clear cache
         if let buildDirContents = try? fm.contentsOfDirectory(atPath: buildDir.string),
            !buildDirContents.contains("Products") {
-            print("SwiftLint: \(target): Clean Build")
+            print("SwiftLintPlugin: \(target): Clean Build")
 
             try? fm.removeItem(at: cacheURL)
             try? fm.removeItem(atPath: outputPath)
@@ -127,21 +127,35 @@ struct SwiftLintPlugin {
 
         var result = [Command]()
         if !filesToProcess.isEmpty {
-            print("SwiftLint: \(target): Processing \(filesToProcess.count) files")
+            print("SwiftLintPlugin: \(target): Processing \(filesToProcess.count) files")
 
             // write updated cache into temporary file, cache file will be overwritten when linting completes
             try JSONEncoder().encode(newCache).write(to: cacheURL.appendingPathExtension("tmp"))
 
             let swiftlint = try tool("swiftlint").path
+            let fileNames = filesToProcess.map { Path($0).lastComponent }.joined(separator: " ")
+            let files = filesToProcess.map { "\"\($0)\"" }.joined(separator: " ")
+
+            let fixCommand = """
+            cd "\(packageDirectory)" && \
+            "\(swiftlint)" --fix --quiet --cache-path "\(workingDirectory)" \(files)
+            """
+
             let lintCommand = """
-            cd "\(packageDirectory)" && "\(swiftlint)" lint --quiet --force-exclude --cache-path "\(workingDirectory)" \
-                \(filesToProcess.map { "\"\($0)\"" }.joined(separator: " ")) \
+            cd "\(packageDirectory)" && \
+            "\(swiftlint)" --quiet --force-exclude --reporter xcode --cache-path "\(workingDirectory)" \(files) \
                 | tee -a "\(outputPath).tmp"
             """
 
             result = [
                 .prebuildCommand(
-                    displayName: "\(target): SwiftLint",
+                    displayName: "swiftlint --fix \(fileNames)",
+                    executable: .sh,
+                    arguments: ["-c", fixCommand],
+                    outputFilesDirectory: outputFilesDirectory
+                ),
+                .prebuildCommand(
+                    displayName: "swiftlint lint \(fileNames)",
                     executable: .sh,
                     arguments: ["-c", lintCommand],
                     outputFilesDirectory: outputFilesDirectory
@@ -149,14 +163,14 @@ struct SwiftLintPlugin {
             ]
 
         } else {
-            print("🤷‍♂️ SwiftLint: \(target): No new files to process")
+            print("🤷‍♂️ SwiftLintPlugin: \(target): No new files to process")
             try JSONEncoder().encode(newCache).write(to: cacheURL)
             try "".write(toFile: outputPath, atomically: false, encoding: .utf8)
         }
 
         // output cached diagnostic messages from previous run
         result.append(.prebuildCommand(
-            displayName: "SwiftLint: \(target): cached \(cacheURL.path)",
+            displayName: "SwiftLintPlugin: \(target): cached \(cacheURL.path)",
             executable: .echo,
             arguments: [cachedDiagnostics.joined(separator: "\n")],
             outputFilesDirectory: outputFilesDirectory
@@ -165,13 +179,13 @@ struct SwiftLintPlugin {
         if !filesToProcess.isEmpty {
             // when ready put temporary cache and output into place
             result.append(.prebuildCommand(
-                displayName: "SwiftLint: \(target): Cache results",
+                displayName: "SwiftLintPlugin: \(target): Caching results",
                 executable: .mv,
                 arguments: ["\(outputPath).tmp", outputPath],
                 outputFilesDirectory: outputFilesDirectory
             ))
             result.append(.prebuildCommand(
-                displayName: "SwiftLint: \(target): Cache source files modification dates",
+                displayName: "SwiftLintPlugin: \(target): Cache source files modification dates",
                 executable: .mv,
                 arguments: [cacheURL.appendingPathExtension("tmp").path, cacheURL.path],
                 outputFilesDirectory: outputFilesDirectory
@@ -232,12 +246,12 @@ struct SwiftLintPlugin {
             let project = try XCProject(path: pluginContext.xcodeProject.filePath)
 
             // get all folders with `.git` subfolder (like BrowserServicesKit) from xc project build files
-            let gitRootFolders = project.objects.values.compactMap { obj -> Path? in
+            let gitRootFolders: [Path] = project.objects.values.compactMap { obj -> Path? in
                 guard obj.isa == .fileReference else { return nil }
                 let path = obj.path
                 guard path.isDirectory && path.appending(subpath: ".git").exists else { return nil }
                 return path
-            } + [pluginContext.xcodeProject.directory] // and project root itself
+            } + [pluginContext.repoRoot!] // and project root itself
 
             // cache
             let cache = ProjectCache(projectModified: projectModified, gitRootFolders: gitRootFolders)
@@ -284,13 +298,13 @@ extension SwiftLintPlugin {
         }
 
         guard (target as? SwiftSourceModuleTarget)?.compilationConditions.contains(.debug) != false || target.kind == .test else {
-            print("SwiftLint: \(target.name): Skipping for RELEASE build")
+            print("SwiftLintPlugin: \(target.name): Skipping for RELEASE build")
             return []
         }
 
         let inputFiles = target.sourceFiles(withSuffix: "swift").map(\.path)
         guard !inputFiles.isEmpty else {
-            print("SwiftLint: \(target.name): No input files")
+            print("SwiftLintPlugin: \(target.name): No input files")
             return []
         }
 
@@ -314,7 +328,7 @@ extension SwiftLintPlugin {
         }.map(\.path)
 
         guard !inputFiles.isEmpty else {
-            print("SwiftLint: \(target): No input files")
+            print("SwiftLintPlugin: \(target): No input files")
             return []
         }
 

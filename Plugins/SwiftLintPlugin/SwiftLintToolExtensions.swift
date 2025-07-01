@@ -103,6 +103,21 @@ struct PluginContext {
 
     let xcodeProject: Project
 
+    var workspaceDir: Path? {
+        processInfo.environment["WORKSPACE_DIR"].map(Path.init)
+    }
+
+    var srcRoot: Path? {
+        processInfo.environment["SRCROOT"].map(Path.init)
+    }
+
+    var repoRoot: Path? {
+        for case .some(let dir) in [workspaceDir, srcRoot, pluginContext.xcodeProject.directory] where dir.appending(subpath: ".git").exists {
+            return dir
+        }
+        return nil
+    }
+
     var buildRoot: Path {
         Path(processInfo.environment["BUILD_ROOT"]!)
     }
@@ -137,7 +152,7 @@ struct PluginContext {
         // swiftlint:disable:next force_try
         let swiftlintFolder = try! fm.contentsOfDirectory(atPath: path.string).first(where: {
             var isFolder: ObjCBool = false
-            return $0.hasPrefix("swiftlint") && fm.fileExists(atPath: path.appending(subpath: $0).string, isDirectory: &isFolder) && isFolder.boolValue
+            return $0.hasPrefix("swiftlint") && $0.hasSuffix("macos") && fm.fileExists(atPath: path.appending(subpath: $0).string, isDirectory: &isFolder) && isFolder.boolValue
         })!
         path = path.appending([swiftlintFolder, "bin", "swiftlint"])
 
