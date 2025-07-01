@@ -250,13 +250,16 @@ struct SwiftLintPlugin {
             // load xc project
             let project = try XCProject(path: pluginContext.xcodeProject.filePath)
 
+            guard let repoRoot = pluginContext.repoRoot else {
+                fatalError("Repo root not found: \(ProcessInfo().environment)")
+            }
             // get all folders with `.git` subfolder (like BrowserServicesKit) from xc project build files
             let gitRootFolders: [Path] = project.objects.values.compactMap { obj -> Path? in
                 guard obj.isa == .fileReference else { return nil }
                 let path = obj.path
                 guard path.isDirectory && path.appending(subpath: ".git").exists else { return nil }
                 return path
-            } + [pluginContext.repoRoot!] // and project root itself
+            } + [repoRoot] // and project root itself
 
             // cache
             let cache = ProjectCache(projectModified: projectModified, gitRootFolders: gitRootFolders)
