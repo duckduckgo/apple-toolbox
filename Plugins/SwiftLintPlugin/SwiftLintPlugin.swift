@@ -147,21 +147,26 @@ struct SwiftLintPlugin {
                 | tee -a "\(outputPath).tmp"
             """
 
-            result = [
-                .prebuildCommand(
-                    displayName: "swiftlint --fix \(fileNames)",
-                    executable: .sh,
-                    arguments: ["-c", fixCommand],
-                    outputFilesDirectory: outputFilesDirectory
-                ),
+            if UserDefaults(suiteName: "com.apple.dt.Xcode")?.bool(forKey: "swiftlint.plugin.autoFixDisabled") == true {
+                print("SwiftLintPlugin: swiftlint.plugin.autoFixDisabled: `defaults write com.apple.dt.Xcode swiftlint.plugin.autoFixDisabled NO` to disable")
+            } else {
+                result = [
+                    .prebuildCommand(
+                        displayName: "swiftlint --fix \(fileNames) (`defaults write com.apple.dt.Xcode swiftlint.plugin.autoFixDisabled YES` to disable)",
+                        executable: .sh,
+                        arguments: ["-c", fixCommand],
+                        outputFilesDirectory: outputFilesDirectory
+                    )
+                ]
+            }
+            result.append(
                 .prebuildCommand(
                     displayName: "swiftlint lint \(fileNames)",
                     executable: .sh,
                     arguments: ["-c", lintCommand],
                     outputFilesDirectory: outputFilesDirectory
                 )
-            ]
-
+            )
         } else {
             print("🤷‍♂️ SwiftLintPlugin: \(target): No new files to process")
             try JSONEncoder().encode(newCache).write(to: cacheURL)
