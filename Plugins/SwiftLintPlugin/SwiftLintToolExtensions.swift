@@ -112,8 +112,13 @@ struct PluginContext {
     }
 
     var repoRoot: Path? {
-        for case .some(let dir) in [workspaceDir, srcRoot, pluginContext.xcodeProject.directory] where dir.appending(subpath: ".git").exists {
-            return dir
+        for case .some(var dir) in [workspaceDir, srcRoot, pluginContext.xcodeProject.directory] where dir.exists {
+            while dir != Path("/") {
+                if dir.appending(subpath: ".git").exists {
+                    return dir
+                }
+                dir = dir.removingLastComponent()
+            }
         }
         return nil
     }
