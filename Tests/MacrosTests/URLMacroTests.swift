@@ -20,13 +20,15 @@ import MacrosImplementation
 import MacroTesting
 import SwiftSyntaxMacros
 import SwiftSyntaxMacrosTestSupport
-import XCTest
+import Testing
 
-final class URLMacroTests: XCTestCase {
+@Suite("URL Macro Tests")
+struct URLMacroTests {
 
     private let macros: [String: Macro.Type] = ["URL": URLMacro.self]
 
-    func testWhenURLMacroAppliedToValidURLs_UrlIniIsGenerated() {
+    @Test("URL macro applied to valid URLs generates URL init")
+    func urlMacroAppliedToValidURLsGeneratesUrlInit() {
         let startLine = #line + 2
         let urls = [
             "http://example.com",
@@ -85,7 +87,8 @@ final class URLMacroTests: XCTestCase {
         }
     }
 
-    func testWhenURLMacroAppliedToURLWithoutScheme_diagnosticsErrorIsReturned() {
+    @Test("URL macro applied to URL without scheme returns diagnostics error")
+    func urlMacroAppliedToURLWithoutSchemeReturnsDiagnosticsError() {
         let startLine = #line + 2
         let urls = [
             "user@somehost.local:9091/index.html",
@@ -120,7 +123,8 @@ final class URLMacroTests: XCTestCase {
         }
     }
 
-    func testWhenURLMacroAppliedToURLsWithInvalidCharacter_diagnosticsErrorIsReturned() {
+    @Test("URL macro applied to URLs with invalid character returns diagnostics error")
+    func urlMacroAppliedToURLsWithInvalidCharacterReturnsDiagnosticsError() {
         let startLine = #line + 2
         let urls: [(String, invalidCharacter: Character)] = [
             ("sheep%2B:P%40%24swrd@💩.la?arg=b#1", "💩"),
@@ -151,8 +155,9 @@ final class URLMacroTests: XCTestCase {
         }
     }
 
-    func testWhenInvalidArgumentProvided_URLMacroFails() {
-        assertMacro(macros, record: false) {
+    @Test("URL macro fails when invalid argument provided")
+    func urlMacroFailsWhenInvalidArgumentProvided() {
+        assertMacro(macros) {
             """
             let s = "duckduckgo.com/"
             let _=#URL(s)
@@ -166,7 +171,7 @@ final class URLMacroTests: XCTestCase {
             """
         }
 
-        assertMacro(macros, record: false) {
+        assertMacro(macros) {
             """
             #URL(duckduckgo)
             """
@@ -178,7 +183,7 @@ final class URLMacroTests: XCTestCase {
             """
         }
 
-        assertMacro(macros, record: false) {
+        assertMacro(macros) {
             """
             #URL(1)
             """
@@ -191,8 +196,9 @@ final class URLMacroTests: XCTestCase {
         }
     }
 
-    func testWhenTooManyArgsProvided_URLMacroFails() {
-        assertMacro(macros, record: false) {
+    @Test("URL macro fails when too many args provided")
+    func urlMacroFailsWhenTooManyArgsProvided() {
+        assertMacro(macros) {
             """
             #URL("duckduckgo.com", "duckduckgo.com")
             """

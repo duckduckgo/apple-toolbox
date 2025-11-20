@@ -23,5 +23,10 @@ import SwiftSyntaxMacros
 struct MacrosCompilerPlugin: CompilerPlugin {
     let providingMacros: [Macro.Type] = [
         URLMacro.self,
+        KeyMacro.self,
+        ReadOnlyKeyMacro.self,
+        StorageIgnoredMacro.self,
+        StorageMacro.self,
+        NestedObservableMacro.self,
     ]
 }
