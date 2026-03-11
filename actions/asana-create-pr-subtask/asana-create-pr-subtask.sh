@@ -94,16 +94,12 @@ _create_pr_subtask() {
 	local due_date=$(_get_next_business_day)
 
 	local payload
-	payload=$(cat <<-EOF
-		{
-			"data": {
-				"assignee": "${asana_assignee_id}",
-				"notes": "${pr_prefix} ${github_pr_url}",
-				"name": "${task_name}",
-				"due_on": "${due_date}"
-			}
-		}
-		EOF
+	payload=$(jq -n \
+		--arg assignee "$asana_assignee_id" \
+		--arg notes "${pr_prefix} ${github_pr_url}" \
+		--arg name "$task_name" \
+		--arg due_on "$due_date" \
+		'{ data: { assignee: $assignee, notes: $notes, name: $name, due_on: $due_on } }'
 	)
 
 	_execute_create_or_update_asana_task_request POST "$url" "$payload"
