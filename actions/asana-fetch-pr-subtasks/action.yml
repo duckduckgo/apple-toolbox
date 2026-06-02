@@ -1,0 +1,50 @@
+name: Fetch Asana PR review subtasks
+description: |
+  Fetches PR review subtasks of an Asana parent task. If a GitHub reviewer
+  username is provided, results are filtered to subtasks assigned to that
+  reviewer. If omitted, all PR review subtasks are returned.
+inputs:
+  access-token:
+    description: "Asana access token"
+    required: true
+    type: string
+  asana-task-id:
+    description: "Parent Asana task gid whose PR review subtasks to fetch"
+    required: true
+    type: string
+  github-reviewer-user:
+    description: "Optional GitHub username. If provided, filter to subtasks assigned to this reviewer. If empty, return all PR review subtasks."
+    required: false
+    type: string
+    default: ''
+  github-token:
+    description: "GitHub token. Required only when github-reviewer-user is set (used to resolve the user's Asana gid)."
+    required: false
+    type: string
+outputs:
+  subtask-ids:
+    description: "JSON array of matching subtask gids. Empty array if none found."
+    value: ${{ steps.fetch-pr-subtasks.outputs.subtask-ids }}
+runs:
+  using: "composite"
+  steps:
+      - name: Get reviewer Asana user ID
+        id: get-asana-user-id
+        if: inputs.github-reviewer-user != ''
+        uses: duckduckgo/native-github-asana-sync@v1.9
+        with:
+          action: 'get-asana-user-id'
+          github-username: ${{ inputs.github-reviewer-user }}
+          github-pat: ${{ inputs.github-token }}
+
+      - name: "Fetch PR subtasks"
+        id: fetch-pr-subtasks
+        shell: bash
+        env:
+          ASANA_ACCESS_TOKEN: ${{ inputs.access-token }}
+          PARENT_TASK_ID: ${{ inputs.asana-task-id }}
+          REVIEWER_USER: ${{ inputs.github-reviewer-user }}
+          ASSIGNEE_FILTER: ${{ steps.get-asana-user-id.outputs.asanaUserId }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          ${{ github.action_path }}/asana-fetch-pr-subtasks.sh
