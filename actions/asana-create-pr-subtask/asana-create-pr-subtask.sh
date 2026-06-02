@@ -88,10 +88,16 @@ _create_pr_subtask() {
 	local asana_assignee_id="$2"
 	local github_pr_url="$3"
 	local github_repo_name="$4"
+	local asana_author_id="$5"
 
 	local url="${asana_api_url}/tasks/${asana_task_id}/subtasks?opt_fields=gid"
 	local task_name="${pr_prefix} ${parent_task_name} (${github_repo_name})"
 	local due_date=$(_get_next_business_day)
+
+	local followers_json='[]'
+	if [[ -n "$asana_author_id" && "$asana_author_id" != "$asana_assignee_id" ]]; then
+		followers_json=$(jq -nc --arg author "$asana_author_id" '[$author]')
+	fi
 
 	local payload
 	payload=$(jq -n \
@@ -99,7 +105,8 @@ _create_pr_subtask() {
 		--arg notes "${pr_prefix} ${github_pr_url}" \
 		--arg name "$task_name" \
 		--arg due_on "$due_date" \
-		'{ data: { assignee: $assignee, notes: $notes, name: $name, due_on: $due_on } }'
+		--argjson followers "$followers_json" \
+		'{ data: { assignee: $assignee, notes: $notes, name: $name, due_on: $due_on, followers: $followers } }'
 	)
 
 	_execute_create_or_update_asana_task_request POST "$url" "$payload"
@@ -144,6 +151,7 @@ main() {
 	local asana_assignee_id="$2"
 	local github_pr_url="$3"
 	local github_repo_name="$4"
+	local asana_author_id="$5"
 
 	# fetch the task subtasks
 	local subtasks
@@ -161,7 +169,7 @@ main() {
 	if [[ -n "$pr_subtask" ]]; then
 		_mark_task_uncompleted_if_needed "$pr_subtask"
 	else
-		_create_pr_subtask "$asana_task_id" "$asana_assignee_id" "$github_pr_url" "$github_repo_name"
+		_create_pr_subtask "$asana_task_id" "$asana_assignee_id" "$github_pr_url" "$github_repo_name" "$asana_author_id"
 	fi
 }
 
