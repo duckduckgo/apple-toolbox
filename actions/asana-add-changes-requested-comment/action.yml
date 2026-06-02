@@ -1,0 +1,31 @@
+name: Add 'changes requested' comment on Asana task
+description: |
+  Posts a templated 'changes requested' comment (story) on an Asana task,
+  attributing the request to the GitHub reviewer who submitted it.
+  Wraps asana-add-comment with the standard message template.
+inputs:
+  access-token:
+    description: "Asana access token. The token owner becomes the comment author."
+    required: true
+    type: string
+  task-id:
+    description: "Asana task gid to comment on (typically the PR review subtask)."
+    required: true
+    type: string
+  github-reviewer-user:
+    description: "GitHub username of the reviewer who requested changes."
+    required: true
+    type: string
+  github-review-url:
+    description: "Link to the GitHub review (github.event.review.html_url)."
+    required: true
+    type: string
+runs:
+  using: "composite"
+  steps:
+      - name: "Post changes-requested comment"
+        uses: duckduckgo/apple-toolbox/actions/asana-add-comment@alessandro/apple-proposal-comment-on-changes-requested
+        with:
+          access-token: ${{ inputs.access-token }}
+          task-id: ${{ inputs.task-id }}
+          comment: "🔄 Changes requested by @${{ inputs.github-reviewer-user }} — see review: ${{ inputs.github-review-url }}"
