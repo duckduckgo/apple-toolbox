@@ -24,7 +24,7 @@ runs:
   using: "composite"
   steps:
       - name: "Post changes-requested comment"
-        uses: duckduckgo/apple-toolbox/actions/asana-add-comment@main
+        uses: duckduckgo/apple-toolbox/actions/asana-add-comment@alessandro/apple-proposal-comment-on-changes-requested
         with:
           access-token: ${{ inputs.access-token }}
           task-id: ${{ inputs.task-id }}
