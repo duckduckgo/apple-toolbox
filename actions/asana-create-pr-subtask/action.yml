@@ -15,6 +15,14 @@ inputs:
     description: "GitHub username for the requested reviewer"
     required: true
     type: string
+  github-pr-author-user:
+    description: "GitHub username for the PR author"
+    required: true
+    type: string
+  github-pr-author-type:
+    description: "GitHub user type of the PR author ('User' or 'Bot'). Pass github.event.pull_request.user.type."
+    required: true
+    type: string
   github-token:
     description: "GitHub token"
     required: false
@@ -28,6 +36,19 @@ runs:
         with:
           action: 'get-asana-user-id'
           github-username: ${{ inputs.github-reviewer-user }}
+          github-pat: ${{ inputs.github-token }}
+
+      - name: Get PR author Asana user ID
+        id: get-asana-author-id
+        # Skip the lookup for bot authors (Dependabot, renovate, github-actions, etc.).
+        # Still best-effort for humans — the downstream script handles an empty
+        # author gid gracefully (followers defaults to []).
+        if: ${{ inputs.github-pr-author-type != 'Bot' }}
+        continue-on-error: true
+        uses: duckduckgo/native-github-asana-sync@v1.9
+        with:
+          action: 'get-asana-user-id'
+          github-username: ${{ inputs.github-pr-author-user }}
           github-pat: ${{ inputs.github-token }}
 
       - name: Get PR URL
@@ -46,5 +67,5 @@ runs:
             echo "Error: Failed to get Asana user ID for GitHub user ${{ inputs.github-reviewer-user }}"
             exit 1
           else
-            ${{ github.action_path }}/asana-create-pr-subtask.sh ${{ inputs.asana-task-id }} ${{ steps.get-asana-user-id.outputs.asanaUserId }} ${{ steps.get-pr-url.outputs.url }} ${{ github.event.repository.name }}
+            ${{ github.action_path }}/asana-create-pr-subtask.sh ${{ inputs.asana-task-id }} ${{ steps.get-asana-user-id.outputs.asanaUserId }} ${{ steps.get-pr-url.outputs.url }} ${{ github.event.repository.name }} "${{ steps.get-asana-author-id.outputs.asanaUserId }}"
           fi
