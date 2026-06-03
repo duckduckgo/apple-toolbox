@@ -74,9 +74,18 @@ _create_pr_subtask() {
 	local task_name="${pr_prefix} ${parent_task_name} (${github_repo_name})"
 	local due_date=$(_get_next_business_day)
 
-	local followers_json='[]'
+	# Always include the reviewer (assignee). Setting `assignee` via the API
+	# does NOT auto-add them to `followers`, so without this they would miss
+	# inbox notifications for activity on the subtask (e.g. automated comments).
+	# Add the author only when distinct from the reviewer.
+	local followers_json
 	if [[ -n "$asana_author_id" && "$asana_author_id" != "$asana_assignee_id" ]]; then
-		followers_json=$(jq -nc --arg author "$asana_author_id" '[$author]')
+		followers_json=$(jq -nc \
+			--arg reviewer "$asana_assignee_id" \
+			--arg author "$asana_author_id" \
+			'[$reviewer, $author]')
+	else
+		followers_json=$(jq -nc --arg reviewer "$asana_assignee_id" '[$reviewer]')
 	fi
 
 	local payload
