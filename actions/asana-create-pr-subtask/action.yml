@@ -19,6 +19,10 @@ inputs:
     description: "GitHub username for the PR author"
     required: true
     type: string
+  github-pr-author-type:
+    description: "GitHub user type of the PR author ('User' or 'Bot'). Pass github.event.pull_request.user.type."
+    required: true
+    type: string
   github-token:
     description: "GitHub token"
     required: false
@@ -36,6 +40,11 @@ runs:
 
       - name: Get PR author Asana user ID
         id: get-asana-author-id
+        # Skip the lookup for bot authors (Dependabot, renovate, github-actions, etc.).
+        # Still best-effort for humans — the downstream script handles an empty
+        # author gid gracefully (followers defaults to []).
+        if: ${{ inputs.github-pr-author-type != 'Bot' }}
+        continue-on-error: true
         uses: duckduckgo/native-github-asana-sync@v1.9
         with:
           action: 'get-asana-user-id'
