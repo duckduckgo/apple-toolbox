@@ -5,28 +5,8 @@
 
 set -e -o pipefail
 
-asana_api_url="https://app.asana.com/api/1.0"
-pr_prefix="PR:"
-
-# Fetch the subtasks of a task with the given Asana task ID.
-_fetch_subtasks() {
-	local asana_task_id="$1"
-	local url="${asana_api_url}/tasks/${asana_task_id}/subtasks?opt_fields=name,completed,parent.name,assignee"
-
-	local response
-	response="$(curl -fLSs "$url" -H "Authorization: Bearer ${ASANA_ACCESS_TOKEN}")"
-
-	# extract the task id, task name, task completed status, assignee id and parent name
-	jq -c '[
-		.data[] | {
-			task_id: .gid,
-			task_name: .name,
-			task_completed: .completed,
-			assignee: .assignee.gid,
-			parent_name: .parent.name
-		}
-	]' <<< "$response"
-}
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../asana-shared.sh"
 
 # Sets the parent task name
 _set_parent_task_name() {
@@ -94,9 +74,18 @@ _create_pr_subtask() {
 	local task_name="${pr_prefix} ${parent_task_name} (${github_repo_name})"
 	local due_date=$(_get_next_business_day)
 
-	local followers_json='[]'
+	# Always include the reviewer (assignee). Setting `assignee` via the API
+	# does NOT auto-add them to `followers`, so without this they would miss
+	# inbox notifications for activity on the subtask (e.g. automated comments).
+	# Add the author only when distinct from the reviewer.
+	local followers_json
 	if [[ -n "$asana_author_id" && "$asana_author_id" != "$asana_assignee_id" ]]; then
-		followers_json=$(jq -nc --arg author "$asana_author_id" '[$author]')
+		followers_json=$(jq -nc \
+			--arg reviewer "$asana_assignee_id" \
+			--arg author "$asana_author_id" \
+			'[$reviewer, $author]')
+	else
+		followers_json=$(jq -nc --arg reviewer "$asana_assignee_id" '[$reviewer]')
 	fi
 
 	local payload
