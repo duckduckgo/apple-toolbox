@@ -1,8 +1,8 @@
 name: Fetch Asana PR review subtasks
 description: |
-  Fetches PR review subtasks of an Asana parent task. Results are filtered
-  by completion state (incomplete by default) and, optionally, by the
-  GitHub reviewer they're assigned to.
+  Fetches PR review subtasks of an Asana parent task. Results can be
+  filtered by completion state and, optionally, by the GitHub reviewer
+  they're assigned to. By default no filtering is applied.
 inputs:
   access-token:
     description: "Asana access token"
@@ -22,10 +22,10 @@ inputs:
     required: false
     type: string
   complete:
-    description: "Filter PR subtasks by completion state. 'false' (default) returns only incomplete subtasks; 'true' returns only completed subtasks; '' (empty string) disables the filter and returns subtasks in any state."
+    description: "Filter PR subtasks by completion state. '' (default) disables the filter and returns subtasks in any state; 'false' returns only incomplete subtasks; 'true' returns only completed subtasks."
     required: false
     type: string
-    default: 'false'
+    default: ''
 outputs:
   subtask-ids:
     description: "JSON array of matching subtask gids. Empty array if none found."
