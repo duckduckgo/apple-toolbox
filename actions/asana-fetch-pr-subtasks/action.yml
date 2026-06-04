@@ -22,7 +22,7 @@ inputs:
     required: false
     type: string
   complete:
-    description: "Filter PR subtasks by completion state. 'false' (default) returns only incomplete subtasks; 'true' returns only completed subtasks."
+    description: "Filter PR subtasks by completion state. 'false' (default) returns only incomplete subtasks; 'true' returns only completed subtasks; '' (empty string) disables the filter and returns subtasks in any state."
     required: false
     type: string
     default: 'false'

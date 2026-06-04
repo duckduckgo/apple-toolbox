@@ -24,7 +24,8 @@ subtasks=$(_fetch_subtasks "$PARENT_TASK_ID")
 # Filter rules:
 #   - task_name matches the "PR: ... (REPO_NAME)" naming convention
 #   - if ASSIGNEE_FILTER is non-empty, assignee gid must match it (else accept all)
-#   - task_completed must equal COMPLETE ('true' or 'false', defaults to 'false')
+#   - if COMPLETE is non-empty, task_completed must equal it ('true' or 'false');
+#     if COMPLETE is empty, the completion-state filter is skipped (accept all).
 subtask_ids=$(jq -c \
 	--arg prefix "$pr_prefix" \
 	--arg repo "$REPO_NAME" \
@@ -33,7 +34,7 @@ subtask_ids=$(jq -c \
 	'[ .[]
 	   | select(.task_name | startswith($prefix) and endswith("(" + $repo + ")"))
 	   | select($assignee == "" or .assignee == $assignee)
-	   | select((.task_completed | tostring) == $complete)
+	   | select($complete == "" or (.task_completed | tostring) == $complete)
 	   | .task_id
 	 ]' <<< "$subtasks")
 
