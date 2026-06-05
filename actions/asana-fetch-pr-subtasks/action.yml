@@ -1,8 +1,8 @@
 name: Fetch Asana PR review subtasks
 description: |
-  Fetches PR review subtasks of an Asana parent task. If a GitHub reviewer
-  username is provided, results are filtered to subtasks assigned to that
-  reviewer. If omitted, all PR review subtasks are returned.
+  Fetches PR review subtasks of an Asana parent task. Results can be
+  filtered by completion state and, optionally, by the GitHub reviewer
+  they're assigned to. By default no filtering is applied.
 inputs:
   access-token:
     description: "Asana access token"
@@ -21,6 +21,11 @@ inputs:
     description: "GitHub token. Required only when github-reviewer-user is set (used to resolve the user's Asana gid)."
     required: false
     type: string
+  complete:
+    description: "Filter PR subtasks by completion state. '' (default) disables the filter and returns subtasks in any state; 'false' returns only incomplete subtasks; 'true' returns only completed subtasks."
+    required: false
+    type: string
+    default: ''
 outputs:
   subtask-ids:
     description: "JSON array of matching subtask gids. Empty array if none found."
@@ -46,5 +51,6 @@ runs:
           REVIEWER_USER: ${{ inputs.github-reviewer-user }}
           ASSIGNEE_FILTER: ${{ steps.get-asana-user-id.outputs.asanaUserId }}
           REPO_NAME: ${{ github.event.repository.name }}
+          COMPLETE: ${{ inputs.complete }}
         run: |
           ${{ github.action_path }}/asana-fetch-pr-subtasks.sh

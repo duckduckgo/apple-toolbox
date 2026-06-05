@@ -1,0 +1,30 @@
+name: Extract Asana task ID from PR body
+description: |
+  Extracts an Asana task gid from text that contains a "Task/Issue URL:"
+  line pointing at app.asana.com. Supports both legacy (/0/) and current
+  (/1/) Asana URL shapes. Outputs an empty string when no task URL is
+  found.
+inputs:
+  text:
+    description: "Text to scan (typically github.event.pull_request.body)"
+    required: true
+    type: string
+outputs:
+  task-id:
+    description: "Extracted Asana task gid, or empty string if not found"
+    value: ${{ steps.extract.outputs.task-id }}
+runs:
+  using: "composite"
+  steps:
+      - name: "Extract task ID"
+        id: extract
+        shell: bash
+        env:
+          BODY: ${{ inputs.text }}
+        run: |
+          task_id=$(grep -i "task/issue url.*https://app.asana.com/" <<< "$BODY" \
+            | perl -pe 's|.*https://app.asana.com/0/[0-9]+/([0-9]+)(?:/f)?|\1|; \
+              s|.*https://app.asana.com/1/[0-9]+(?:/[0-9a-z/]*)?/task/([0-9]+)(:?/[0-9a-z/]*)?(?:\?focus=true)?|\1|; \
+              s|.*https://app.asana.com/1/[0-9]+/inbox/[0-9]+/item/([0-9]+)/story/([0-9]+)(?:\?focus=true)?|\1|'
+          )
+          echo "task-id=${task_id//[^0-9]/}" >> "$GITHUB_OUTPUT"
