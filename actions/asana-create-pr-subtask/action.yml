@@ -27,6 +27,14 @@ inputs:
     description: "GitHub token"
     required: false
     type: string
+  asana-project-id:
+    description: "Optional Asana project gid to add the PR subtask to. When empty, the subtask is not added to any project."
+    required: false
+    type: string
+  asana-section-id:
+    description: "Optional Asana section gid within asana-project-id. Ignored when asana-project-id is empty."
+    required: false
+    type: string
 runs:
   using: "composite"
   steps:
@@ -67,5 +75,5 @@ runs:
             echo "Error: Failed to get Asana user ID for GitHub user ${{ inputs.github-reviewer-user }}"
             exit 1
           else
-            ${{ github.action_path }}/asana-create-pr-subtask.sh ${{ inputs.asana-task-id }} ${{ steps.get-asana-user-id.outputs.asanaUserId }} ${{ steps.get-pr-url.outputs.url }} ${{ github.event.repository.name }} "${{ steps.get-asana-author-id.outputs.asanaUserId }}"
+            ${{ github.action_path }}/asana-create-pr-subtask.sh ${{ inputs.asana-task-id }} ${{ steps.get-asana-user-id.outputs.asanaUserId }} ${{ steps.get-pr-url.outputs.url }} ${{ github.event.repository.name }} "${{ steps.get-asana-author-id.outputs.asanaUserId }}" "${{ inputs.asana-project-id }}" "${{ inputs.asana-section-id }}"
           fi

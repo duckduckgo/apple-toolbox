@@ -69,6 +69,8 @@ _create_pr_subtask() {
 	local github_pr_url="$3"
 	local github_repo_name="$4"
 	local asana_author_id="$5"
+	local asana_project_id="$6"
+	local asana_section_id="$7"
 
 	local url="${asana_api_url}/tasks/${asana_task_id}/subtasks?opt_fields=gid"
 	local task_name="${pr_prefix} ${parent_task_name} (${github_repo_name})"
@@ -98,7 +100,15 @@ _create_pr_subtask() {
 		'{ data: { assignee: $assignee, notes: $notes, name: $name, due_on: $due_on, followers: $followers } }'
 	)
 
-	_execute_create_or_update_asana_task_request POST "$url" "$payload"
+	local created_gid
+	created_gid=$(_execute_create_or_update_asana_task_request POST "$url" "$payload")
+
+	# Optionally file the new subtask into a tracking project (and section).
+	# Gated on a non-empty project id so other consumers of this action, which
+	# don't pass these inputs, are unaffected.
+	if [[ -n "$asana_project_id" ]]; then
+		_add_task_to_project "$created_gid" "$asana_project_id" "$asana_section_id"
+	fi
 }
 
 # Assigns a reviewer to the existing PR subtask and update the task status if it is marked 'completed'
@@ -133,6 +143,36 @@ _execute_create_or_update_asana_task_request() {
 		-H 'content-type: application/json' \
 		--data "${payload}" \
 		| jq -r .data.gid)"
+
+	# Emit the gid so callers can capture it (e.g. to add the new task to a project).
+	echo "$task_id"
+}
+
+# Adds an existing task to a project, optionally dropping it into a specific
+# section. Best-effort: a failure here must not fail the action, since the
+# subtask itself was already created successfully.
+_add_task_to_project() {
+	local task_id="$1"
+	local project_id="$2"
+	local section_id="$3"
+
+	local url="${asana_api_url}/tasks/${task_id}/addProject"
+	local payload
+	if [[ -n "$section_id" ]]; then
+		payload=$(jq -n --arg project "$project_id" --arg section "$section_id" \
+			'{ data: { project: $project, section: $section } }')
+	else
+		payload=$(jq -n --arg project "$project_id" \
+			'{ data: { project: $project } }')
+	fi
+
+	if ! curl -fLSs -X POST "$url" \
+		-H "Authorization: Bearer ${ASANA_ACCESS_TOKEN}" \
+		-H 'accept: application/json' \
+		-H 'content-type: application/json' \
+		--data "${payload}" > /dev/null; then
+		echo "::warning::Could not add subtask ${task_id} to project ${project_id} (section ${section_id:-none}). The subtask was created regardless."
+	fi
 }
 
 main() {
@@ -141,6 +181,8 @@ main() {
 	local github_pr_url="$3"
 	local github_repo_name="$4"
 	local asana_author_id="$5"
+	local asana_project_id="$6"
+	local asana_section_id="$7"
 
 	# fetch the task subtasks
 	local subtasks
@@ -158,7 +200,7 @@ main() {
 	if [[ -n "$pr_subtask" ]]; then
 		_mark_task_uncompleted_if_needed "$pr_subtask"
 	else
-		_create_pr_subtask "$asana_task_id" "$asana_assignee_id" "$github_pr_url" "$github_repo_name" "$asana_author_id"
+		_create_pr_subtask "$asana_task_id" "$asana_assignee_id" "$github_pr_url" "$github_repo_name" "$asana_author_id" "$asana_project_id" "$asana_section_id"
 	fi
 }
 
